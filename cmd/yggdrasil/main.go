@@ -47,7 +47,7 @@ func main() {
 	normaliseconf := flag.Bool("normaliseconf", false, "use in combination with either -useconf or -useconffile, outputs your configuration normalised")
 	exportkey := flag.Bool("exportkey", false, "use in combination with either -useconf or -useconffile, outputs your private key in PEM format")
 	confjson := flag.Bool("json", false, "print configuration from -genconf or -normaliseconf as JSON instead of HJSON")
-	autoconf := flag.Bool("autoconf", false, "automatic mode (dynamic IP, peer with IPv6 neighbors)")
+	// autoconf := flag.Bool("autoconf", false, "automatic mode (dynamic IP, peer with IPv6 neighbors)")
 	ver := flag.Bool("version", false, "prints the version of this build")
 	logto := flag.String("logto", "stdout", "file path to log to, \"syslog\" or \"stdout\"")
 	getaddr := flag.Bool("address", false, "use in combination with either -useconf or -useconffile, outputs your IPv6 address")
@@ -97,9 +97,9 @@ func main() {
 		fmt.Println("Build version:", version.BuildVersion())
 		return
 
-	case *autoconf:
-		// Use an autoconf-generated config, this will give us random keys and
-		// port numbers, and will use an automatically selected TUN interface.
+	// case *autoconf:
+	// Use an autoconf-generated config, this will give us random keys and
+	// port numbers, and will use an automatically selected TUN interface.
 
 	case *useconf:
 		if _, err := cfg.ReadFrom(os.Stdin); err != nil {
