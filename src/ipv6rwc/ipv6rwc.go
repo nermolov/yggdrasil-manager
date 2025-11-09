@@ -13,6 +13,7 @@ import (
 
 	iwt "github.com/Arceliar/ironwood/types"
 
+	"github.com/nermolov/yggdrasil-manager/src/filter"
 	"github.com/yggdrasil-network/yggdrasil-go/src/address"
 	"github.com/yggdrasil-network/yggdrasil-go/src/core"
 
@@ -43,6 +44,7 @@ type keyStore struct {
 	subnetToInfo map[address.Subnet]*keyInfo
 	subnetBuffer map[address.Subnet]*buffer
 	mtu          uint64
+	filter       *filter.Filter
 }
 
 type keyInfo struct {
@@ -57,7 +59,7 @@ type buffer struct {
 	timeout *time.Timer
 }
 
-func (k *keyStore) init(c *core.Core) {
+func (k *keyStore) init(c *core.Core, f *filter.Filter) {
 	k.core = c
 	k.address = *address.AddrForKey(k.core.PublicKey())
 	k.subnet = *address.SubnetForKey(k.core.PublicKey())
@@ -74,6 +76,7 @@ func (k *keyStore) init(c *core.Core) {
 	k.subnetToInfo = make(map[address.Subnet]*keyInfo)
 	k.subnetBuffer = make(map[address.Subnet]*buffer)
 	k.mtu = 1280 // Default to something safe, expect user to set this
+	k.filter = f
 }
 
 func (k *keyStore) sendToAddress(addr address.Address, bs []byte) {
@@ -277,6 +280,9 @@ func (k *keyStore) readPC(p []byte) (int, error) {
 		if srcAddr != info.address && srcSubnet != info.subnet {
 			continue // bad remote address/subnet
 		}
+		if !k.filter.IsAllowed(&srcAddr) {
+			continue
+		}
 		n = copy(p, bs)
 		return n, nil
 	}
@@ -303,6 +309,11 @@ func (k *keyStore) writePC(bs []byte) (int, error) {
 		return 0, errors.New(strErr)
 	}
 	if dstAddr.IsValid() {
+		// if dstAddr doesn't match allowed addresses, return error
+		if !k.filter.IsAllowed(&dstAddr) {
+			strErr := fmt.Sprint("destination address not allowed: ", net.IP(dstAddr[:]).String())
+			return 0, errors.New(strErr)
+		}
 		k.sendToAddress(dstAddr, bs)
 	} else if dstSubnet.IsValid() {
 		k.sendToSubnet(dstSubnet, bs)
@@ -341,9 +352,9 @@ type ReadWriteCloser struct {
 	keyStore
 }
 
-func NewReadWriteCloser(c *core.Core) *ReadWriteCloser {
+func NewReadWriteCloser(c *core.Core, f *filter.Filter) *ReadWriteCloser {
 	rwc := new(ReadWriteCloser)
-	rwc.init(c)
+	rwc.init(c, f)
 	return rwc
 }
 

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"os/signal"
@@ -21,10 +22,12 @@ import (
 	"github.com/hjson/hjson-go/v4"
 	"github.com/kardianos/minwinsvc"
 
+	mconfig "github.com/nermolov/yggdrasil-manager/src/config"
+	"github.com/nermolov/yggdrasil-manager/src/filter"
+	"github.com/nermolov/yggdrasil-manager/src/ipv6rwc"
 	"github.com/yggdrasil-network/yggdrasil-go/src/address"
 	"github.com/yggdrasil-network/yggdrasil-go/src/admin"
 	"github.com/yggdrasil-network/yggdrasil-go/src/config"
-	"github.com/yggdrasil-network/yggdrasil-go/src/ipv6rwc"
 
 	"github.com/yggdrasil-network/yggdrasil-go/src/core"
 	"github.com/yggdrasil-network/yggdrasil-go/src/multicast"
@@ -90,6 +93,7 @@ func main() {
 	}
 
 	cfg := config.GenerateConfig()
+	mcfg := mconfig.ManagerConfig{}
 	var err error
 	switch {
 	case *ver:
@@ -102,7 +106,14 @@ func main() {
 	// port numbers, and will use an automatically selected TUN interface.
 
 	case *useconf:
-		if _, err := cfg.ReadFrom(os.Stdin); err != nil {
+		cfgBytes, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			panic(err)
+		}
+		if err := cfg.UnmarshalHJSON(cfgBytes); err != nil {
+			panic(err)
+		}
+		if err := mcfg.UnmarshalHJSON(cfgBytes); err != nil {
 			panic(err)
 		}
 
@@ -111,7 +122,14 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		if _, err := cfg.ReadFrom(f); err != nil {
+		cfgBytes, err := io.ReadAll(f)
+		if err != nil {
+			panic(err)
+		}
+		if err := cfg.UnmarshalHJSON(cfgBytes); err != nil {
+			panic(err)
+		}
+		if err := mcfg.UnmarshalHJSON(cfgBytes); err != nil {
 			panic(err)
 		}
 		_ = f.Close()
@@ -274,7 +292,13 @@ func main() {
 			tun.InterfaceName(cfg.IfName),
 			tun.InterfaceMTU(cfg.IfMTU),
 		}
-		if n.tun, err = tun.New(ipv6rwc.NewReadWriteCloser(n.core), logger, options...); err != nil {
+
+		filter, err := filter.NewFilter(mcfg.Manager.FilterAllowedPublicKeys)
+		if err != nil {
+			panic(err)
+		}
+
+		if n.tun, err = tun.New(ipv6rwc.NewReadWriteCloser(n.core, filter), logger, options...); err != nil {
 			panic(err)
 		}
 		if n.admin != nil && n.tun != nil {

@@ -60,24 +60,9 @@ ip netns exec node2 ip link set lo up
 ip netns exec node3 ip link set lo up
 ip netns exec node4 ip link set lo up
 
-echo "-- Starting Yggdrasil nodes"
-
-# Start yggdrasil on each node
-echo '{AdminListen: "tcp://127.0.0.1:9001"}' | ip netns exec node1 ./yggdrasil --useconf &
-echo '{AdminListen: "tcp://127.0.0.1:9001"}' | ip netns exec node2 ./yggdrasil --useconf &
-echo '{AdminListen: "tcp://127.0.0.1:9001"}' | ip netns exec node3 ./yggdrasil --useconf &
-echo '{AdminListen: "tcp://127.0.0.1:9001"}' | ip netns exec node4 ./yggdrasil --useconf &
-
-echo "Started, press Ctrl+C to stop all yggdrasil processes"
+echo "Set up complete, press Ctrl+C to clean up."
 
 cleanup() {
-  echo "-- Stopping Yggdrasil nodes"
-  killall yggdrasil
-  
-  # Wait for all yggdrasil processes to exit
-  while pgrep yggdrasil >/dev/null; do
-    sleep 0.5
-  done
 
   echo "-- Cleaning up network"
   ip netns delete node1

@@ -1,128 +1,133 @@
 package integration
 
 import (
-	"encoding/json"
-	"errors"
+	"crypto/ed25519"
+	"encoding/hex"
+	"fmt"
 	"net"
 	"testing"
+	"time"
 
 	probing "github.com/prometheus-community/pro-bing"
 	"github.com/stretchr/testify/assert"
-	"github.com/yggdrasil-network/yggdrasil-go/src/admin"
+	"github.com/yggdrasil-network/yggdrasil-go/src/address"
 )
 
+const NODE_COUNT = 4
+
 type Node struct {
-	Namespace   string
-	IPV6Address *string
+	Namespace               string
+	IPV6Address             string
+	PrivateKey              ed25519.PrivateKey
+	PublicKey               ed25519.PublicKey
+	FilterAllowedPublicKeys []ed25519.PublicKey
 }
 
 // TestFirewallPacketDropping ensures that ping packets are dropped according to the firewall rules.
-// Relies on `run-four-fully-connected-nodes.sh` to set up 4 nodes in network namespaces.
+// Relies on `run-four-fully-connected-nodes.sh` to set up 4 network namespaces.
 func TestFirewallPacketDropping(t *testing.T) {
-	nodes := []Node{
-		{Namespace: "node1"},
-		{Namespace: "node2"},
-		{Namespace: "node3"},
-		{Namespace: "node4"},
-	}
+	nodes := []Node{}
 
-	// get the IPv6 addresses of the nodes
-	t.Log("Getting IPv6 addresses of nodes")
-
-	for i := range nodes {
-		setNetworkNamespace(nodes[i].Namespace)
-
-		ipAddress, err := getYggdrasilIPAddress("127.0.0.1:9001")
+	// initial config generation
+	for i := range NODE_COUNT {
+		pubkey, privkey, err := ed25519.GenerateKey(nil)
 		if err != nil {
 			panic(err)
 		}
 
-		nodes[i].IPV6Address = &ipAddress
-
-		t.Log(ipAddress)
+		node := Node{
+			Namespace:   fmt.Sprintf("node%d", i+1),
+			PrivateKey:  privkey,
+			PublicKey:   pubkey,
+			IPV6Address: net.IP(address.AddrForKey(pubkey)[:]).String(),
+		}
+		nodes = append(nodes, node)
 	}
+
+	// add firewall rules
+	for i := range NODE_COUNT {
+		allowedKeys := []ed25519.PublicKey{}
+		for j := range NODE_COUNT {
+			if i == j {
+				continue
+			}
+			// allow even indexed nodes to talk to each other, block odd indexed nodes
+			if (i%2 == 0 && j%2 == 0) || (i%2 == 1 && j%2 == 1) {
+				allowedKeys = append(allowedKeys, nodes[j].PublicKey)
+			}
+		}
+		nodes[i].FilterAllowedPublicKeys = allowedKeys
+	}
+
+	// start each node
+	for i := range NODE_COUNT {
+		t.Logf("Starting node %s with allowed keys: %d", nodes[i].Namespace, len(nodes[i].FilterAllowedPublicKeys))
+
+		config := map[string]any{
+			"AdminListen": "none",
+			"PrivateKey":  hex.EncodeToString(nodes[i].PrivateKey),
+			"Manager": map[string]any{
+				"FilterAllowedPublicKeys": func() []string {
+					keysHex := []string{}
+					for _, pk := range nodes[i].FilterAllowedPublicKeys {
+						keysHex = append(keysHex, hex.EncodeToString(pk))
+					}
+					return keysHex
+				}(),
+			},
+		}
+
+		RunYggdrasilNode(t, nodes[i].Namespace, config)
+	}
+
+	// wait for nodes to discover each other
+	time.Sleep(3 * time.Second)
 
 	// for each node, ping every other node
 	t.Log("Pinging between nodes to test firewall rules")
 
-	for i := range nodes {
-		for j := range nodes {
-			if i == j {
+	for sourceIdx := range nodes {
+		for targetIdx := range nodes {
+			if sourceIdx == targetIdx {
 				continue
 			}
 
-			setNetworkNamespace(nodes[i].Namespace)
+			t.Logf("Setting network namespace to %s", nodes[sourceIdx].Namespace)
+			setNetworkNamespace(nodes[sourceIdx].Namespace)
 
-			pinger, err := probing.NewPinger(*nodes[j].IPV6Address)
+			pinger, err := probing.NewPinger(nodes[targetIdx].IPV6Address)
 
 			if err != nil {
-				t.Errorf("Failed to create pinger from %s to %s: %v", nodes[i].Namespace, nodes[j].Namespace, err)
+				t.Errorf("Failed to create pinger from %s to %s: %v", nodes[sourceIdx].Namespace, nodes[targetIdx].Namespace, err)
 				continue
 			}
 
 			pinger.SetPrivileged(true)
 			pinger.Count = 1
+			pinger.Timeout = 10 * time.Millisecond
 
-			t.Logf("Pinging from %s (%s) to %s (%s)", nodes[i].Namespace, *nodes[i].IPV6Address, nodes[j].Namespace, *nodes[j].IPV6Address)
+			t.Logf("Pinging from %s (%s) to %s (%s)", nodes[sourceIdx].Namespace, nodes[sourceIdx].IPV6Address, nodes[targetIdx].Namespace, nodes[targetIdx].IPV6Address)
 
 			err = pinger.Run()
 			if err != nil {
-				t.Errorf("Could not run pinger from %s to %s: %v", nodes[i].Namespace, nodes[j].Namespace, err)
+				t.Errorf("Could not run pinger from %s to %s: %v", nodes[sourceIdx].Namespace, nodes[targetIdx].Namespace, err)
 			}
 
 			stats := pinger.Statistics()
-			t.Logf("Ping statistics from %s to %s: %+v", nodes[i].Namespace, nodes[j].Namespace, stats)
+			t.Logf("Ping statistics from %s to %s: %+v", nodes[sourceIdx].Namespace, nodes[targetIdx].Namespace, stats)
 
-			assert.Equal(t, pinger.Count, stats.PacketsRecv, "All packets should be received from %s to %s", nodes[i].Namespace, nodes[j].Namespace)
+			allowed := false
+			for _, pk := range nodes[targetIdx].FilterAllowedPublicKeys {
+				if pk.Equal(nodes[sourceIdx].PublicKey) {
+					allowed = true
+					break
+				}
+			}
+			if allowed {
+				assert.Equal(t, pinger.Count, stats.PacketsRecv, "All packets should be received from %s to %s", nodes[sourceIdx].Namespace, nodes[targetIdx].Namespace)
+			} else {
+				assert.Equal(t, 0, stats.PacketsRecv, "No packets should be received from %s to %s", nodes[sourceIdx].Namespace, nodes[targetIdx].Namespace)
+			}
 		}
 	}
-}
-
-func getYggdrasilIPAddress(endpoint string) (string, error) {
-	// Connect to the TCP socket
-	conn, err := net.Dial("tcp", endpoint)
-	if err != nil {
-		return "", err
-	}
-	defer conn.Close()
-
-	// Set up JSON encoder/decoder
-	decoder := json.NewDecoder(conn)
-	encoder := json.NewEncoder(conn)
-
-	// Prepare the request
-	send := &admin.AdminSocketRequest{
-		Name: "getself",
-	}
-	args := map[string]string{}
-	if send.Arguments, err = json.Marshal(args); err != nil {
-		return "", err
-	}
-
-	// Send the request
-	if err := encoder.Encode(&send); err != nil {
-		return "", err
-	}
-
-	// Receive the response
-	recv := &admin.AdminSocketResponse{}
-	if err := decoder.Decode(&recv); err != nil {
-		return "", err
-	}
-
-	// Check for errors
-	if recv.Status == "error" {
-		if recv.Error != "" {
-			return "", errors.New(recv.Error)
-		}
-		return "", errors.New("admin socket returned an error")
-	}
-
-	// Parse the response
-	var resp admin.GetSelfResponse
-	if err := json.Unmarshal(recv.Response, &resp); err != nil {
-		return "", err
-	}
-
-	return resp.IPAddress, nil
 }
