@@ -1,4 +1,4 @@
-package testutils
+package integration
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func SetNetworkNamespace(nsName string) {
+func setNetworkNamespace(nsName string) {
 	nsPath := "/run/netns/" + nsName
 
 	// Lock the OS thread to ensure consistent namespace operations

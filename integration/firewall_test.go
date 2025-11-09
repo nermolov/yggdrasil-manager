@@ -1,4 +1,4 @@
-package firewall
+package integration
 
 import (
 	"encoding/json"
@@ -6,7 +6,6 @@ import (
 	"net"
 	"testing"
 
-	"github.com/nermolov/yggdrasil-manager/src/firewall/testutils"
 	probing "github.com/prometheus-community/pro-bing"
 	"github.com/stretchr/testify/assert"
 	"github.com/yggdrasil-network/yggdrasil-go/src/admin"
@@ -31,7 +30,7 @@ func TestFirewallPacketDropping(t *testing.T) {
 	t.Log("Getting IPv6 addresses of nodes")
 
 	for i := range nodes {
-		testutils.SetNetworkNamespace(nodes[i].Namespace)
+		setNetworkNamespace(nodes[i].Namespace)
 
 		ipAddress, err := getYggdrasilIPAddress("127.0.0.1:9001")
 		if err != nil {
@@ -52,7 +51,7 @@ func TestFirewallPacketDropping(t *testing.T) {
 				continue
 			}
 
-			testutils.SetNetworkNamespace(nodes[i].Namespace)
+			setNetworkNamespace(nodes[i].Namespace)
 
 			pinger, err := probing.NewPinger(*nodes[j].IPV6Address)
 
