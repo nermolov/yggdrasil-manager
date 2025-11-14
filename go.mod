@@ -3,6 +3,7 @@ module github.com/nermolov/yggdrasil-manager
 go 1.24.7
 
 require (
+	github.com/Arceliar/ironwood v0.0.0-20241213013129-743fe2fccbd3
 	github.com/gologme/log v1.3.0
 	github.com/hashicorp/go-syslog v1.0.0
 	github.com/hjson/hjson-go/v4 v4.5.0
@@ -11,12 +12,12 @@ require (
 	github.com/prometheus-community/pro-bing v0.7.0
 	github.com/stretchr/testify v1.9.0
 	github.com/yggdrasil-network/yggdrasil-go v0.5.12
+	golang.org/x/net v0.41.0
 	golang.org/x/sys v0.33.0
 	golang.org/x/text v0.26.0
 )
 
 require (
-	github.com/Arceliar/ironwood v0.0.0-20241213013129-743fe2fccbd3 // indirect
 	github.com/Arceliar/phony v0.0.0-20220903101357-530938a4b13d // indirect
 	github.com/bits-and-blooms/bitset v1.13.0 // indirect
 	github.com/bits-and-blooms/bloom/v3 v3.7.0 // indirect
@@ -35,7 +36,6 @@ require (
 	go.uber.org/mock v0.5.0 // indirect
 	golang.org/x/crypto v0.39.0 // indirect
 	golang.org/x/mod v0.25.0 // indirect
-	golang.org/x/net v0.41.0 // indirect
 	golang.org/x/sync v0.15.0 // indirect
 	golang.org/x/tools v0.33.0 // indirect
 	golang.zx2c4.com/wintun v0.0.0-20230126152724-0fa3db229ce2 // indirect
