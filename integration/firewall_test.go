@@ -77,7 +77,7 @@ func TestFirewallPacketDropping(t *testing.T) {
 			},
 		}
 
-		RunYggdrasilNode(t, nodes[i].Namespace, config)
+		runYggdrasilNode(t, nodes[i].Namespace, config)
 	}
 
 	// wait for nodes to discover each other

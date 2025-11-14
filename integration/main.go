@@ -32,7 +32,7 @@ func setNetworkNamespace(nsName string) {
 	}
 }
 
-func RunYggdrasilNode(t *testing.T, namespace string, config map[string]any) {
+func runYggdrasilNode(t *testing.T, namespace string, config map[string]any) {
 	cmd := exec.CommandContext(t.Context(), "ip", "netns", "exec", namespace, "../yggdrasil", "-useconf")
 
 	// log stdout/stderr with prefix
