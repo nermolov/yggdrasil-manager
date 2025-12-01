@@ -98,8 +98,7 @@ func TestFirewallPacketDropping(t *testing.T) {
 			pinger, err := probing.NewPinger(nodes[targetIdx].IPV6Address)
 
 			if err != nil {
-				t.Errorf("Failed to create pinger from %s to %s: %v", nodes[sourceIdx].Namespace, nodes[targetIdx].Namespace, err)
-				continue
+				t.Fatalf("Failed to create pinger from %s to %s: %v", nodes[sourceIdx].Namespace, nodes[targetIdx].Namespace, err)
 			}
 
 			pinger.SetPrivileged(true)
@@ -110,7 +109,7 @@ func TestFirewallPacketDropping(t *testing.T) {
 
 			err = pinger.Run()
 			if err != nil {
-				t.Errorf("Could not run pinger from %s to %s: %v", nodes[sourceIdx].Namespace, nodes[targetIdx].Namespace, err)
+				t.Fatalf("Could not run pinger from %s to %s: %v", nodes[sourceIdx].Namespace, nodes[targetIdx].Namespace, err)
 			}
 
 			stats := pinger.Statistics()
