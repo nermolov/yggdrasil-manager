@@ -8,10 +8,12 @@ import (
 
 	"github.com/gologme/log"
 
+	mconfig "github.com/nermolov/yggdrasil-manager/src/config"
+	"github.com/nermolov/yggdrasil-manager/src/filter"
+	"github.com/nermolov/yggdrasil-manager/src/ipv6rwc"
 	"github.com/yggdrasil-network/yggdrasil-go/src/address"
 	"github.com/yggdrasil-network/yggdrasil-go/src/config"
 	"github.com/yggdrasil-network/yggdrasil-go/src/core"
-	"github.com/yggdrasil-network/yggdrasil-go/src/ipv6rwc"
 	"github.com/yggdrasil-network/yggdrasil-go/src/multicast"
 	"github.com/yggdrasil-network/yggdrasil-go/src/tun"
 	"github.com/yggdrasil-network/yggdrasil-go/src/version"
@@ -26,6 +28,7 @@ type Yggdrasil struct {
 	core      *core.Core
 	iprwc     *ipv6rwc.ReadWriteCloser
 	config    *config.NodeConfig
+	mconfig   *mconfig.ManagerConfig
 	multicast *multicast.Multicast
 	tun       *tun.TunAdapter // optional
 	log       MobileLogger
@@ -50,6 +53,10 @@ func (m *Yggdrasil) StartJSON(configjson []byte) error {
 	m.config = config.GenerateConfig()
 	if err := m.config.UnmarshalHJSON(configjson); err != nil {
 		return err
+	}
+	m.mconfig = &mconfig.ManagerConfig{}
+	if err := m.mconfig.UnmarshalHJSON(configjson); err != nil {
+		panic(err)
 	}
 	// Set up the Yggdrasil node itself.
 	{
@@ -113,8 +120,13 @@ func (m *Yggdrasil) StartJSON(configjson []byte) error {
 		}
 	}
 
+	filter, err := filter.NewFilter(m.mconfig.Manager.FilterAllowedPublicKeys)
+	if err != nil {
+		panic(err)
+	}
+
 	mtu := m.config.IfMTU
-	m.iprwc = ipv6rwc.NewReadWriteCloser(m.core)
+	m.iprwc = ipv6rwc.NewReadWriteCloser(m.core, filter)
 	if m.iprwc.MaxMTU() < mtu {
 		mtu = m.iprwc.MaxMTU()
 	}
