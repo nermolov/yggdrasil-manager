@@ -1,2 +1,5 @@
+# build artifacts
 /yggdrasil
 /yggdrasilctl
+/yggdrasil-sources.jar
+/yggdrasil.aar
