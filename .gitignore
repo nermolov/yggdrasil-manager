@@ -3,3 +3,6 @@
 /yggdrasilctl
 /yggdrasil-sources.jar
 /yggdrasil.aar
+# misc
+configs/
+.vscode/
