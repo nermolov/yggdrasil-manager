@@ -57,6 +57,7 @@ if [ $ANDROID ]; then
   go get golang.org/x/mobile/bind
   gomobile bind \
     -target android -tags mobile -o yggdrasil.aar \
+    -androidapi=21 \
     -ldflags="$LDFLAGS $STRIP" -gcflags="$GCFLAGS" \
     ./contrib/mobile ./src/config;
 fi
