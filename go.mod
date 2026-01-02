@@ -5,6 +5,7 @@ go 1.24.7
 require (
 	github.com/Arceliar/ironwood v0.0.0-20241213013129-743fe2fccbd3
 	github.com/gologme/log v1.3.0
+	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-syslog v1.0.0
 	github.com/hjson/hjson-go/v4 v4.5.0
 	github.com/kardianos/minwinsvc v1.0.2
@@ -22,19 +23,11 @@ require (
 	github.com/bits-and-blooms/bitset v1.13.0 // indirect
 	github.com/bits-and-blooms/bloom/v3 v3.7.0 // indirect
 	github.com/coder/websocket v1.8.13 // indirect
-	github.com/d4l3k/go-pry v0.0.0-20230221054152-cca3eb982836 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/google/pprof v0.0.0-20210407192527-94a9f03dee38 // indirect
-	github.com/google/uuid v1.6.0 // indirect
-	github.com/mattn/go-colorable v0.1.13 // indirect
-	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
-	github.com/mattn/go-tty v0.0.3 // indirect
-	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
-	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/onsi/ginkgo/v2 v2.9.5 // indirect
-	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/quic-go/quic-go v0.52.0 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
