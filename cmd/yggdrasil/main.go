@@ -23,6 +23,7 @@ import (
 	"github.com/kardianos/minwinsvc"
 
 	mconfig "github.com/nermolov/yggdrasil-manager/src/config"
+	"github.com/nermolov/yggdrasil-manager/src/dns"
 	"github.com/nermolov/yggdrasil-manager/src/filter"
 	"github.com/nermolov/yggdrasil-manager/src/ipv6rwc"
 	"github.com/yggdrasil-network/yggdrasil-go/src/address"
@@ -40,6 +41,7 @@ type node struct {
 	tun       *tun.TunAdapter
 	multicast *multicast.Multicast
 	admin     *admin.AdminSocket
+	dns       *dns.DnsManager
 }
 
 // The main function is responsible for configuring and starting Yggdrasil.
@@ -306,6 +308,12 @@ func main() {
 		}
 	}
 
+	// Force DNS resolution (on some platforms)
+	{
+		n.dns = dns.New(n.core, logger)
+		n.dns.ForceResolution()
+	}
+
 	//Windows service shutdown
 	minwinsvc.SetOnExit(func() {
 		logger.Infof("Shutting down service ...")
@@ -344,6 +352,7 @@ func main() {
 	_ = n.admin.Stop()
 	_ = n.multicast.Stop()
 	_ = n.tun.Stop()
+	n.dns.Cleanup()
 	n.core.Stop()
 }
 
