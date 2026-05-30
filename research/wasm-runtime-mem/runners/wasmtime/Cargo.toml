@@ -1,0 +1,19 @@
+[package]
+name = "runner-wasmtime"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "runner-wasmtime"
+path = "src/main.rs"
+
+[dependencies]
+# Wasmtime with Pulley interpreter; disable cranelift (JIT) codegen
+wasmtime = { version = "33", default-features = false, features = [
+    "runtime",
+    "cranelift",  # keep for now — pulley is the interpreter engine selected at runtime
+    "wasi",
+    "component-model",
+] }
+wasmtime-wasi = { version = "33", default-features = false }
+anyhow = "1"

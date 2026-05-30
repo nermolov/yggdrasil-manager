@@ -1,0 +1,31 @@
+[package]
+name = "subduction-wasi-server"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "subduction-wasi-server"
+path = "src/main.rs"
+
+[dependencies]
+# Subduction core — pinned SHA
+automerge = { git = "https://github.com/inkandswitch/subduction.git", rev = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2", package = "automerge" }
+# Synchronous WebSocket (no tokio required)
+tungstenite = { version = "0.24", default-features = false }
+
+[features]
+default = []
+# Enable the wstd async fallback (only if std::net is insufficient on the target Wasmtime)
+wstd-fallback = ["dep:wstd"]
+
+[dependencies.wstd]
+version = "0.4"
+optional = true
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true
+
+[profile.release.build-override]
+opt-level = 0
