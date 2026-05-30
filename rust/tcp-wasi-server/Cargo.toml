@@ -1,7 +1,0 @@
-[package]
-name = "tcp-wasi-server"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-wasi = "0.11"
