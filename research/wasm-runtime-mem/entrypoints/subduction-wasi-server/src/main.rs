@@ -37,15 +37,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut ws = tungstenite::accept(stream)?;
 
     // Initialize an empty Automerge document to sync against.
-    let mut doc = automerge::AutoCommit::new();
+    let doc = automerge::Automerge::new();
 
-    // Run a simple sync loop: receive messages, apply them, send back our state.
+    // Run a simple sync loop: echo back our document state on each binary message.
     // Exit when the client closes the connection.
     use tungstenite::Message;
     loop {
         match ws.read() {
-            Ok(Message::Binary(data)) => {
-                let _ = doc.apply_encoded_changes(&data);
+            Ok(Message::Binary(_data)) => {
                 // Echo back our current document state as a sync response.
                 let saved = doc.save();
                 ws.send(Message::Binary(saved))?;
