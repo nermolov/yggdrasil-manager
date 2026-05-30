@@ -52,15 +52,13 @@ func Flush(w io.Writer, outDir string) error {
 		}
 	}
 
-	// Print table.
+	// Print table. tablewriter v1.x uses Header/Append/Render; formatting
+	// defaults are fine for this report.
 	table := tablewriter.NewWriter(w)
-	table.SetHeader([]string{
+	table.Header([]string{
 		"Runtime", "WASI", "Interp?", "C-bound?",
 		"PeakRSS(KiB)", "VmHWM(KiB)", "Wall(ms)", "OK",
 	})
-	table.SetAutoFormatHeaders(false)
-	table.SetBorder(true)
-	table.SetAutoWrapText(false)
 
 	for _, r := range snapshot {
 		interp := "no"
@@ -78,7 +76,7 @@ func Flush(w io.Writer, outDir string) error {
 				ok = "no: " + r.ErrMsg
 			}
 		}
-		table.Append([]string{
+		if err := table.Append([]string{
 			r.Runtime,
 			r.WASITarget,
 			interp,
@@ -87,9 +85,13 @@ func Flush(w io.Writer, outDir string) error {
 			strconv.FormatInt(r.VmHWMKiB, 10),
 			strconv.FormatInt(r.WallMs, 10),
 			ok,
-		})
+		}); err != nil {
+			return fmt.Errorf("Flush: append row: %w", err)
+		}
 	}
 
-	table.Render()
+	if err := table.Render(); err != nil {
+		return fmt.Errorf("Flush: render table: %w", err)
+	}
 	return nil
 }

@@ -8,19 +8,11 @@ name = "subduction-wasi-server"
 path = "src/main.rs"
 
 [dependencies]
-# Subduction core — pinned SHA
 automerge = { git = "https://github.com/automerge/automerge", branch = "fragments" }
-# Synchronous WebSocket (no tokio required)
-tungstenite = { version = "0.24", default-features = false }
-
-[features]
-default = []
-# Enable the wstd async fallback (only if std::net is insufficient on the target Wasmtime)
-wstd-fallback = ["dep:wstd"]
-
-[dependencies.wstd]
-version = "0.4"
-optional = true
+# Synchronous WebSocket handshake + framing. default-features=false drops the
+# TLS surface (which would pull rustls, unbuildable on wasip2); `handshake`
+# re-enables the blocking accept() server API we need.
+tungstenite = { version = "0.24", default-features = false, features = ["handshake"] }
 
 [profile.release]
 opt-level = "s"

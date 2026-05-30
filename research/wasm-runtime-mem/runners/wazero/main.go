@@ -75,6 +75,13 @@ func run() error {
 		_ = mod.Close(ctx)
 	}
 
+	// Forward the module's framed stdout to our own stdout so the Go harness
+	// can read and validate the synced document (it captures the runner's
+	// stdout, not the module's directly).
+	if _, werr := os.Stdout.Write(stdoutData); werr != nil {
+		return fmt.Errorf("forward stdout: %w", werr)
+	}
+
 	// Validate: response must be at least 4 bytes (length prefix)
 	if len(stdoutData) < 4 {
 		return fmt.Errorf("unexpected stdout length %d", len(stdoutData))
@@ -86,17 +93,13 @@ func run() error {
 	return nil
 }
 
-type bytesReader struct{ r io.Reader }
-
-func newBytesReader(b []byte) io.Reader { return &bytesReader{r: newByteSliceReader(b)} }
-
 // byteSliceReader wraps a byte slice as an io.Reader.
 type byteSliceReader struct {
 	data []byte
 	pos  int
 }
 
-func newByteSliceReader(b []byte) *byteSliceReader { return &byteSliceReader{data: b} }
+func newBytesReader(b []byte) io.Reader { return &byteSliceReader{data: b} }
 func (r *byteSliceReader) Read(p []byte) (int, error) {
 	if r.pos >= len(r.data) {
 		return 0, io.EOF
