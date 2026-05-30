@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <unistd.h>
 
 /* wasm3 public API */
 #include "wasm3.h"
@@ -49,12 +50,16 @@ int main(int argc, char *argv[]) {
     memcpy(stdin_buf + 4, doc_bytes, doc_len);
     free(doc_bytes);
 
-    /* Redirect stdin/stdout for the WASM module */
-    /* We use a pipe trick: write to a tmpfile for stdin */
+    /* Feed the length-prefixed payload to the module via real fd 0: wasm3's
+     * WASI fd_read reads the host's stdin, so we stage the bytes in a tmpfile
+     * and dup2 it onto STDIN_FILENO before running _start. */
     FILE *tmp = tmpfile();
+    if (!tmp) die("tmpfile");
     fwrite(stdin_buf, 1, stdin_len, tmp);
+    fflush(tmp);
     rewind(tmp);
     free(stdin_buf);
+    if (dup2(fileno(tmp), STDIN_FILENO) < 0) die("dup2 stdin");
 
     IM3Environment env = m3_NewEnvironment();
     IM3Runtime      rt  = m3_NewRuntime(env, 65536, NULL);
@@ -75,12 +80,15 @@ int main(int argc, char *argv[]) {
     if (res) { fprintf(stderr, "runner-wasm3: find _start: %s\n", res); return 1; }
 
     res = m3_CallV(f);
-    /* exit code from WASI exit() comes via a special result — treat non-null as error */
-    if (res && strcmp(res, "exit(0)") != 0) {
+    /* A clean WASI proc_exit surfaces as the m3Err_trapExit trap; wasm3's
+     * uvwasi layer does not expose the exit code, so we treat that trap as a
+     * normal exit. The harness validates correctness via the framed stdout. */
+    if (res && strcmp(res, m3Err_trapExit) != 0) {
         fprintf(stderr, "runner-wasm3: call _start: %s\n", res);
         return 1;
     }
 
+    fflush(stdout);
     free(wasm_bytes);
     return 0;
 }
