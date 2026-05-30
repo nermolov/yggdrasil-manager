@@ -1,4 +1,4 @@
-package wasm
+package integration
 
 import (
 	"fmt"
@@ -20,8 +20,8 @@ var (
 	buildTmpDir  string
 )
 
-// executor builds (once) and returns the path to the wasm-executor binary.
-func executor(t *testing.T) string {
+// wasmExecutor builds (once) and returns the path to the wasm-executor binary.
+func wasmExecutor(t *testing.T) string {
 	t.Helper()
 	buildOnce.Do(func() {
 		d, err := os.MkdirTemp("", "wasm-executor-test-*")
@@ -32,15 +32,8 @@ func executor(t *testing.T) string {
 		buildTmpDir = d
 		bin := filepath.Join(d, "wasm-executor")
 
-		pkgDir, err := os.Getwd()
-		if err != nil {
-			buildErr = err
-			return
-		}
-		moduleRoot := filepath.Join(pkgDir, "..")
-
 		cmd := exec.Command("go", "build", "-o", bin, "./cmd/wasm-executor")
-		cmd.Dir = moduleRoot
+		cmd.Dir = ".."
 		if out, err := cmd.CombinedOutput(); err != nil {
 			buildErr = fmt.Errorf("go build wasm-executor: %w\n%s", err, out)
 			return
@@ -60,12 +53,7 @@ func buildWasm(t *testing.T, program string) string {
 		t.Skip("cargo not in PATH")
 	}
 
-	pkgDir, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	dir := filepath.Join(pkgDir, "rust", program)
-
+	dir := filepath.Join("..", "wasm", "rust", program)
 	cmd := exec.Command("cargo", "build", "--target", "wasm32-wasip1", "--release")
 	cmd.Dir = dir
 	if out, err := cmd.CombinedOutput(); err != nil {
@@ -77,7 +65,7 @@ func buildWasm(t *testing.T, program string) string {
 // runWasm executes a .wasm file with the executor, asserting zero exit and ≤25 MB peak RSS.
 func runWasm(t *testing.T, wasmPath string) {
 	t.Helper()
-	cmd := exec.Command(executor(t), wasmPath)
+	cmd := exec.Command(wasmExecutor(t), wasmPath)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("wasm-executor %s: %v\n%s", filepath.Base(wasmPath), err, out)
