@@ -37,6 +37,8 @@ require (
 	github.com/olekukonko/ll v0.1.6 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/quic-go/quic-go v0.59.0 // indirect
+	github.com/stealthrocket/wasi-go v0.8.0 // indirect
+	github.com/stealthrocket/wazergo v0.19.1 // indirect
 	github.com/tetratelabs/wazero v1.8.2 // indirect
 	github.com/vishvananda/netlink v1.3.1 // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
