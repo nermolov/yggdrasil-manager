@@ -53,7 +53,7 @@ func buildWasm(t *testing.T, program string) string {
 		t.Skip("cargo not in PATH")
 	}
 
-	dir := filepath.Join("..", "wasm", "rust", program)
+	dir := filepath.Join("rust", program)
 	cmd := exec.Command("cargo", "build", "--target", "wasm32-wasip1", "--release")
 	cmd.Dir = dir
 	if out, err := cmd.CombinedOutput(); err != nil {

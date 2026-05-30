@@ -7,4 +7,4 @@
 configs/
 .vscode/
 # Rust build artifacts
-wasm/rust/*/target/
+integration/rust/*/target/
