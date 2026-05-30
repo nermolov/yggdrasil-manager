@@ -23,7 +23,7 @@ func main() {
 	}
 
 	ctx := context.Background()
-	rt := wazero.NewRuntime(ctx)
+	rt := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter())
 	defer rt.Close(ctx)
 
 	wasi_snapshot_preview1.MustInstantiate(ctx, rt)
