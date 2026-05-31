@@ -1,0 +1,20 @@
+[package]
+name = "subduction-stdio-sync"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "subduction-stdio-sync"
+path = "src/main.rs"
+
+[dependencies]
+# automerge from the same "fragments" branch Subduction uses
+automerge = { git = "https://github.com/automerge/automerge", branch = "fragments" }
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true
+
+[profile.release.build-override]
+opt-level = 0

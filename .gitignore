@@ -6,3 +6,4 @@
 # misc
 configs/
 .vscode/
+/research/wasm-runtime-mem/.cache/

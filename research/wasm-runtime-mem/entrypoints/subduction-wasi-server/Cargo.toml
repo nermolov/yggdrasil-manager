@@ -1,0 +1,23 @@
+[package]
+name = "subduction-wasi-server"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "subduction-wasi-server"
+path = "src/main.rs"
+
+[dependencies]
+automerge = { git = "https://github.com/automerge/automerge", branch = "fragments" }
+# Synchronous WebSocket handshake + framing. default-features=false drops the
+# TLS surface (which would pull rustls, unbuildable on wasip2); `handshake`
+# re-enables the blocking accept() server API we need.
+tungstenite = { version = "0.24", default-features = false, features = ["handshake"] }
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true
+
+[profile.release.build-override]
+opt-level = 0
