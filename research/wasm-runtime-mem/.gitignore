@@ -6,3 +6,5 @@ entrypoints/*/target/
 runners/*/build/
 runners/*/build-classic/
 runners/*/build-fast/
+# Rust runner (wasmtime) build output.
+runners/*/target/
