@@ -1,6 +1,6 @@
 ---
 title: "Suite 1 completion + wasip3 best-effort (Option C)"
-status: not-started
+status: done
 option: C
 branch: claude/wasm-runtime-memory-tests-wRAbA
 builds_on: plan-02-remaining-suite1.md (Option B)

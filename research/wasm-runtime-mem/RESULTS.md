@@ -60,10 +60,16 @@ The native baseline was fixed to pass `--ephemeral-key` to `subduction_cli
 server` and a fixed `--doc-id` to the ingest client so the fixture filename
 stem is not parsed as base58check.
 
-| Runtime         | Target | Interp mode   | C-bound      | Peak RSS (MiB) | Peak RSS (KiB) |
-|-----------------|--------|---------------|--------------|----------------|----------------|
-| native-baseline | native | —             | —            | 14.7           | 15,020         |
-| wasmtime-pulley | wasip2 | Pulley interp | no (Rust)    | 64.7           | 66,216         |
+| Runtime          | Target | Interp mode   | C-bound      | Peak RSS (MiB) | Peak RSS (KiB) |
+|------------------|--------|---------------|--------------|----------------|----------------|
+| native-baseline  | native | —             | —            | 14.7           | 15,020         |
+| wasmtime-pulley  | wasip2 | Pulley interp | no (Rust)    | 64.7           | 66,216         |
+| wasmtime-wasip3  | wasip3 | —             | —            | skipped        | skipped        |
+
+**wasmtime-wasip3**: skipped — `wasm32-wasip3` target has no prebuilt artifacts on the pinned
+`stable` Rust toolchain; `subduction-wasi-server-p3.wasm` was not produced. The capability gate
+in `scripts/20-rust-wasm.sh` and the `t.Skip` in `suite1_server_test.go` ensure this never
+blocks the native + wasip2 results.
 
 Note: the `automerge-subduction-ingest` client exits with an error because the
 minimal 58-byte `DocumentAM` fixture is not a complete Automerge document for

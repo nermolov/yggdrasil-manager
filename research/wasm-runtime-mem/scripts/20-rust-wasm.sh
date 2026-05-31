@@ -42,5 +42,17 @@ cp "$ENTRYPOINTS_DIR/subduction-wasi-server/target/wasm32-wasip2/release/subduct
    "$ROOT_DIR/$BIN_DIR/"
 info "subduction-wasi-server.wasm built"
 
+# Build subduction-wasi-server (wasip3) — Suite 1 wasip3 best-effort
+if [ "${WASIP3_AVAILABLE:-0}" -eq 1 ]; then
+  info "Building subduction-wasi-server (wasm32-wasip3)..."
+  (cd "$ENTRYPOINTS_DIR/subduction-wasi-server" && \
+    cargo build --release --target wasm32-wasip3 2>&1)
+  cp "$ENTRYPOINTS_DIR/subduction-wasi-server/target/wasm32-wasip3/release/subduction-wasi-server.wasm" \
+     "$ROOT_DIR/$BIN_DIR/subduction-wasi-server-p3.wasm"
+  info "subduction-wasi-server-p3.wasm built"
+else
+  info "WARN: Skipping wasip3 server build — wasm32-wasip3 not available on this toolchain"
+fi
+
 info "WASM build complete. .wasm files:"
 ls -lh "$ROOT_DIR/$BIN_DIR/"*.wasm 2>/dev/null || info "No .wasm files found"

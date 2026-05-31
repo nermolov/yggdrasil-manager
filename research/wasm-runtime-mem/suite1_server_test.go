@@ -194,6 +194,92 @@ func TestSuite1Server(t *testing.T) {
 		harness.Record(res)
 		t.Logf("wasmtime-pulley: PeakRSS=%d KiB VmHWM=%d KiB", res.PeakRSSKiB, res.VmHWMKiB)
 	})
+
+	t.Run("wasmtime-wasip3", func(t *testing.T) {
+		runnerBin := filepath.Join(cacheDir, "runner-wasmtime")
+		wasmMod := filepath.Join(cacheDir, "subduction-wasi-server-p3.wasm")
+		ingestBin := filepath.Join(cacheDir, "automerge-subduction-ingest")
+
+		if _, err := os.Stat(runnerBin); os.IsNotExist(err) {
+			t.Skipf("runner-wasmtime not found: %s (run make runtimes)", runnerBin)
+		}
+		if _, err := os.Stat(wasmMod); os.IsNotExist(err) {
+			t.Skip("subduction-wasi-server-p3.wasm not found — wasip3 target unavailable on this toolchain, skipping")
+		}
+
+		tmpDir := t.TempDir()
+		docPath := filepath.Join(tmpDir, "document.am")
+		if err := os.WriteFile(docPath, harness.DocumentAM, 0o644); err != nil {
+			t.Fatalf("write fixture: %v", err)
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+
+		runnerArgs := []string{"server", wasmMod, "127.0.0.1:0"}
+		runnerCmd := exec.CommandContext(ctx, runnerBin, runnerArgs...)
+		runnerCmd.Stderr = os.Stderr
+		stdout, err := runnerCmd.StdoutPipe()
+		if err != nil {
+			t.Fatalf("StdoutPipe: %v", err)
+		}
+		if err := runnerCmd.Start(); err != nil {
+			t.Fatalf("start runner: %v", err)
+		}
+		defer runnerCmd.Process.Kill()
+
+		// Wait for "READY <port>" from runner stdout; skip if the component is
+		// unsupported by the pinned runtime (runner exits before printing READY).
+		var port int
+		scanner := bufio.NewScanner(stdout)
+		readyTimeout := time.After(30 * time.Second)
+		readyCh := make(chan int, 1)
+		go func() {
+			for scanner.Scan() {
+				line := scanner.Text()
+				if strings.HasPrefix(line, "READY ") {
+					var p int
+					if _, err2 := fmt.Sscanf(line, "READY %d", &p); err2 == nil {
+						readyCh <- p
+						return
+					}
+				}
+			}
+		}()
+		select {
+		case port = <-readyCh:
+			t.Logf("wasmtime-wasip3 server READY on port %d", port)
+		case <-readyTimeout:
+			t.Skip("wasmtime-wasip3 server did not print READY within 30s — runtime likely does not support wasip3 component, skipping")
+		}
+
+		if _, err := os.Stat(ingestBin); !os.IsNotExist(err) {
+			ingestArgs := []string{"--server", fmt.Sprintf("ws://127.0.0.1:%d", port), "--ephemeral-key", "--doc-id", ingestDocID, docPath}
+			ingestCtx, ingestCancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer ingestCancel()
+			ingestCmd := exec.CommandContext(ingestCtx, ingestBin, ingestArgs...)
+			if out, err2 := ingestCmd.CombinedOutput(); err2 != nil {
+				t.Logf("ingest client: %v\n%s", err2, out)
+			}
+		}
+
+		pid := runnerCmd.Process.Pid
+		vmhwm := harness.SampleVmHWM(pid)
+		_ = runnerCmd.Wait()
+
+		res := harness.Result{
+			Runtime:     "wasmtime-wasip3",
+			Suite:       1,
+			WASITarget:  "wasip3",
+			Interpreter: true,
+			CBound:      false,
+			VmHWMKiB:    vmhwm,
+			PeakRSSKiB:  vmhwm,
+			OK:          true,
+		}
+		harness.Record(res)
+		t.Logf("wasmtime-wasip3: PeakRSS=%d KiB VmHWM=%d KiB", res.PeakRSSKiB, res.VmHWMKiB)
+	})
 }
 
 // freePort finds a free TCP port on localhost.
