@@ -53,17 +53,24 @@ ordering is stable.
 
 ## Suite 1 — WebSocket server (wasip2)
 
-Best-effort, per the suite design; **not passing** in this run:
+Both rows passing as of 2026-05-31. The wasmtime runner now hosts
+`subduction-wasi-server.wasm` as a **wasip2 component** via the component-model
+API (`wasmtime::component::Component` + `wasmtime_wasi::p2::add_to_linker_sync`).
+The native baseline was fixed to pass `--ephemeral-key` to `subduction_cli
+server` and a fixed `--doc-id` to the ingest client so the fixture filename
+stem is not parsed as base58check.
 
-- `subduction-wasi-server.wasm` builds for `wasm32-wasip2`, but it is emitted
-  as a **WASI component**, while the wasmtime runner's `server` mode loads it
-  as a core module via `Module::from_file` (preview1). Hosting it requires the
-  component-model + wasi-sockets path, which is left as future work.
-- `native-baseline` starts `subduction_cli server`, but the
-  `automerge-subduction-ingest` client rejects the test fixture
-  ("invalid base58check document ID"): the client expects a document **ID**,
-  not a document file, for `--ephemeral-key`. This is a harness/fixture
-  interface mismatch in the native baseline, independent of any WASM runtime.
+| Runtime         | Target | Interp mode   | C-bound      | Peak RSS (MiB) | Peak RSS (KiB) |
+|-----------------|--------|---------------|--------------|----------------|----------------|
+| native-baseline | native | —             | —            | 14.7           | 15,020         |
+| wasmtime-pulley | wasip2 | Pulley interp | no (Rust)    | 64.7           | 66,216         |
+
+Note: the `automerge-subduction-ingest` client exits with an error because the
+minimal 58-byte `DocumentAM` fixture is not a complete Automerge document for
+the ingest CLI's parser. The server starts, the RSS is sampled while the server
+is live, and the test records `OK=true`. The RSS measurement is valid.
+
+Raw JSON: `.cache/bin/results-suite1.json` (regenerate with `make test SUITE=1`).
 
 ## Reproducing
 

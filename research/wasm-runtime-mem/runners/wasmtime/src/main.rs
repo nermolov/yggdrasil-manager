@@ -10,9 +10,10 @@
 use anyhow::{bail, Context, Result};
 use std::io::Write;
 use std::path::PathBuf;
+use wasmtime::component::ResourceTable;
 use wasmtime::{Config, Engine, Linker, Module, Store};
 use wasmtime_wasi::p2::pipe::{MemoryInputPipe, MemoryOutputPipe};
-use wasmtime_wasi::p2::WasiCtxBuilder;
+use wasmtime_wasi::p2::{IoView, WasiCtx, WasiCtxBuilder, WasiView};
 use wasmtime_wasi::preview1::{self, WasiP1Ctx};
 
 fn make_engine() -> Result<Engine> {
@@ -23,6 +24,8 @@ fn make_engine() -> Result<Engine> {
     cfg.target("pulley64")
         .context("select pulley64 target")?;
     cfg.consume_fuel(false);
+    // Component model must be enabled for Suite 1 server mode.
+    cfg.wasm_component_model(true);
     Engine::new(&cfg)
 }
 
@@ -80,6 +83,24 @@ fn run_stdio(args: &[String]) -> Result<()> {
     Ok(())
 }
 
+// ServerState holds the WASI context and resource table for the component host.
+struct ServerState {
+    table: ResourceTable,
+    wasi: WasiCtx,
+}
+
+impl IoView for ServerState {
+    fn table(&mut self) -> &mut ResourceTable {
+        &mut self.table
+    }
+}
+
+impl WasiView for ServerState {
+    fn ctx(&mut self) -> &mut WasiCtx {
+        &mut self.wasi
+    }
+}
+
 fn run_server(args: &[String]) -> Result<()> {
     if args.len() < 3 {
         bail!("server mode: runner-wasmtime server <module.wasm> [bind-addr]");
@@ -93,17 +114,28 @@ fn run_server(args: &[String]) -> Result<()> {
         .inherit_stdin()
         .inherit_stdout() // READY line forwarded to our stdout
         .inherit_stderr()
-        .build_p1();
+        .inherit_network()
+        .allow_tcp(true)
+        .build();
+
+    let state = ServerState {
+        table: ResourceTable::new(),
+        wasi,
+    };
 
     let engine = make_engine()?;
-    let module = Module::from_file(&engine, &mod_path).context("load module")?;
-    let mut store = Store::new(&engine, wasi);
+    let component = wasmtime::component::Component::from_file(&engine, &mod_path)
+        .context("load component")?;
+    let mut store = Store::new(&engine, state);
 
-    let mut linker: Linker<WasiP1Ctx> = Linker::new(&engine);
-    preview1::add_to_linker_sync(&mut linker, |s| s)?;
+    let mut linker: wasmtime::component::Linker<ServerState> =
+        wasmtime::component::Linker::new(&engine);
+    wasmtime_wasi::p2::add_to_linker_sync(&mut linker)?;
 
-    let instance = linker.instantiate(&mut store, &module)?;
-    let start = instance.get_typed_func::<(), ()>(&mut store, "_start")?;
-    start.call(&mut store, ())?;
-    Ok(())
+    let cmd =
+        wasmtime_wasi::p2::bindings::sync::Command::instantiate(&mut store, &component, &linker)?;
+    match cmd.wasi_cli_run().call_run(&mut store)? {
+        Ok(()) => Ok(()),
+        Err(()) => bail!("wasm component exited with non-zero status"),
+    }
 }
