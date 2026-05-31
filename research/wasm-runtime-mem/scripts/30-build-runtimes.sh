@@ -53,12 +53,14 @@ build_wamr() {
   mkdir -p "$dest/build-classic"
   cmake -S "$dest/src/product-mini/platforms/linux" -B "$dest/build-classic" \
     -DWAMR_BUILD_INTERP=1 -DWAMR_BUILD_JIT=0 -DWAMR_BUILD_FAST_INTERP=0 \
+    -DWAMR_BUILD_LIBC_WASI=1 -DWAMR_BUILD_REF_TYPES=1 -DWAMR_BUILD_TAIL_CALL=1 \
     -DCMAKE_BUILD_TYPE=Release
   cmake --build "$dest/build-classic" --parallel
   # Fast interpreter
   mkdir -p "$dest/build-fast"
   cmake -S "$dest/src/product-mini/platforms/linux" -B "$dest/build-fast" \
     -DWAMR_BUILD_INTERP=1 -DWAMR_BUILD_JIT=0 -DWAMR_BUILD_FAST_INTERP=1 \
+    -DWAMR_BUILD_LIBC_WASI=1 -DWAMR_BUILD_REF_TYPES=1 -DWAMR_BUILD_TAIL_CALL=1 \
     -DCMAKE_BUILD_TYPE=Release
   cmake --build "$dest/build-fast" --parallel
   info "WAMR built (classic + fast interp)"

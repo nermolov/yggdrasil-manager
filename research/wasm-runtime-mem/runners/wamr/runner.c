@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <unistd.h>
 #include "wasm_export.h"
 
 static void die(const char *msg) {
@@ -45,6 +46,16 @@ int main(int argc, char *argv[]) {
     memcpy(stdin_buf + 4, doc_bytes, doc_len);
     free(doc_bytes);
 
+    /* WAMR's libc-wasi maps WASI fd 0 to the host stdin (fd 0). Stage the
+     * payload in a tmpfile and dup2 it onto STDIN_FILENO before running. */
+    FILE *tmp = tmpfile();
+    if (!tmp) die("tmpfile");
+    fwrite(stdin_buf, 1, stdin_len, tmp);
+    fflush(tmp);
+    rewind(tmp);
+    free(stdin_buf);
+    if (dup2(fileno(tmp), STDIN_FILENO) < 0) die("dup2 stdin");
+
     RuntimeInitArgs init_args;
     memset(&init_args, 0, sizeof(init_args));
     init_args.mem_alloc_type = Alloc_With_System_Allocator;
@@ -56,19 +67,32 @@ int main(int argc, char *argv[]) {
     wasm_module_t mod = wasm_runtime_load(wasm_bytes, wasm_len, err, sizeof(err));
     if (!mod) { fprintf(stderr, "runner-wamr: load: %s\n", err); return 1; }
 
+    /* WASI args must be configured on the module *before* instantiation.
+     * This default-stdio variant inherits the host fds 0/1/2, so the module
+     * reads our dup2'd stdin and writes the framed response to our stdout. */
+    char *wasi_argv[] = { argv[1] };
+    wasm_runtime_set_wasi_args(mod, NULL, 0, NULL, 0, NULL, 0, wasi_argv, 1);
+
     wasm_module_inst_t inst = wasm_runtime_instantiate(mod, 65536, 65536, err, sizeof(err));
     if (!inst) { fprintf(stderr, "runner-wamr: instantiate: %s\n", err); return 1; }
 
-    /* Set up WASI args: feed stdin_buf via argv-passed fd or wasm_runtime_set_wasi_args */
-    const char *wasi_argv[] = { argv[1] };
-    wasm_runtime_set_wasi_args(mod, NULL, 0, NULL, 0, wasi_argv, 1, -1, -1, -1);
+    int ret = 0;
+    if (!wasm_application_execute_main(inst, 0, NULL)) {
+        const char *ex = wasm_runtime_get_exception(inst);
+        /* A clean WASI proc_exit(0) is reported as an exception string; only
+         * a non-zero WASI exit code is a real failure. */
+        uint32_t code = wasm_runtime_get_wasi_exit_code(inst);
+        if (code != 0) {
+            fprintf(stderr, "runner-wamr: exec: %s (wasi exit %u)\n",
+                    ex ? ex : "(none)", code);
+            ret = 1;
+        }
+    }
 
-    wasm_application_execute_main(inst, 0, NULL);
-
+    fflush(stdout);
     wasm_runtime_deinstantiate(inst);
     wasm_runtime_unload(mod);
     wasm_runtime_destroy();
     free(wasm_bytes);
-    free(stdin_buf);
-    return 0;
+    return ret;
 }
