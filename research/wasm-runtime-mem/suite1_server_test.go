@@ -196,15 +196,18 @@ func TestSuite1Server(t *testing.T) {
 	})
 
 	t.Run("wasmtime-wasip3", func(t *testing.T) {
-		runnerBin := filepath.Join(cacheDir, "runner-wasmtime")
+		// wasmtime-p3 is the wasmtime CLI (v41) downloaded by make runtimes.
+		// It provides wasi:*@0.3.0-rc-2026-01-06 host APIs via -S p3, matching
+		// what the nightly-2026-02-01 build-std component imports.
+		wasmtimeBin := filepath.Join(cacheDir, "wasmtime-p3")
 		wasmMod := filepath.Join(cacheDir, "subduction-wasi-server-p3.wasm")
 		ingestBin := filepath.Join(cacheDir, "automerge-subduction-ingest")
 
-		if _, err := os.Stat(runnerBin); os.IsNotExist(err) {
-			t.Skipf("runner-wasmtime not found: %s (run make runtimes)", runnerBin)
+		if _, err := os.Stat(wasmtimeBin); os.IsNotExist(err) {
+			t.Skipf("wasmtime-p3 not found: %s (run make runtimes)", wasmtimeBin)
 		}
 		if _, err := os.Stat(wasmMod); os.IsNotExist(err) {
-			t.Skip("subduction-wasi-server-p3.wasm not found — wasip3 target unavailable on this toolchain, skipping")
+			t.Skip("subduction-wasi-server-p3.wasm not found — wasip3 build unavailable (run make wasm), skipping")
 		}
 
 		tmpDir := t.TempDir()
@@ -216,20 +219,20 @@ func TestSuite1Server(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer cancel()
 
-		runnerArgs := []string{"server", wasmMod, "127.0.0.1:0"}
-		runnerCmd := exec.CommandContext(ctx, runnerBin, runnerArgs...)
+		// wasmtime run -S p3 -S inherit-network -S tcp <wasm> 127.0.0.1:0
+		// The component prints "READY <port>\n" once the WebSocket server is bound.
+		runnerArgs := []string{"run", "-S", "p3", "-S", "inherit-network", "-S", "tcp", wasmMod, "127.0.0.1:0"}
+		runnerCmd := exec.CommandContext(ctx, wasmtimeBin, runnerArgs...)
 		runnerCmd.Stderr = os.Stderr
 		stdout, err := runnerCmd.StdoutPipe()
 		if err != nil {
 			t.Fatalf("StdoutPipe: %v", err)
 		}
 		if err := runnerCmd.Start(); err != nil {
-			t.Fatalf("start runner: %v", err)
+			t.Fatalf("start wasmtime-p3: %v", err)
 		}
 		defer runnerCmd.Process.Kill()
 
-		// Wait for "READY <port>" from runner stdout; skip if the component is
-		// unsupported by the pinned runtime (runner exits before printing READY).
 		var port int
 		scanner := bufio.NewScanner(stdout)
 		readyTimeout := time.After(30 * time.Second)
@@ -250,7 +253,7 @@ func TestSuite1Server(t *testing.T) {
 		case port = <-readyCh:
 			t.Logf("wasmtime-wasip3 server READY on port %d", port)
 		case <-readyTimeout:
-			t.Skip("wasmtime-wasip3 server did not print READY within 30s — runtime likely does not support wasip3 component, skipping")
+			t.Skip("wasmtime-wasip3 server did not print READY within 30s — skipping")
 		}
 
 		if _, err := os.Stat(ingestBin); !os.IsNotExist(err) {

@@ -83,3 +83,16 @@ Highest of the three options. wasip3 target/runtime support is likely
 unavailable on the pinned Rust + wasmtime, so the realistic outcome is a clean
 skip with a documented note. The capability gates ensure this never blocks the
 native + wasip2 results delivered by Option B.
+
+## Toolchain research findings (2026-05-31)
+
+`wasm32-wasip3` is Tier 3 on all Rust channels (no prebuilt stdlib via rustup).
+The working build path is `cargo +nightly-2026-02-01 -Z build-std=std,panic_abort`.
+The February 2026 nightly was chosen deliberately: it predates wasip3 stdlib support,
+so the component only imports `wasi:*@0.3.0-rc-2026-01-06` (from `wasip3-0.4.0` locked
+by getrandom/automerge). Later nightlies add `wasi:*@0.3.0-rc-2026-03-15` stdlib
+imports alongside the January RC imports, making the component unrunnable on any
+single wasmtime release. The wasmtime v41.0.0 CLI (released 2026-01-20) is the
+first release that provides the January RC host APIs via `-S p3`.
+
+Peak RSS measured: **28.8 MiB (29,540 KiB)** — Cranelift JIT mode, not Pulley.
