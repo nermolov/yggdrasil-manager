@@ -102,9 +102,13 @@ build_wasmedge() {
   ensure_dir "$dest"
   git clone --depth=1 --branch "$WASMEDGE_TAG" https://github.com/WasmEdge/WasmEdge.git "$dest/src" 2>/dev/null || true
   mkdir -p "$dest/build"
+  # WASMEDGE_USE_LLVM=OFF builds the interpreter-only runtime (the old
+  # WASMEDGE_BUILD_AOT_RUNTIME name no longer reliably disables the LLVM dep).
   cmake -S "$dest/src" -B "$dest/build" \
-    -DWASMEDGE_BUILD_AOT_RUNTIME=OFF \
+    -DWASMEDGE_USE_LLVM=OFF \
     -DWASMEDGE_BUILD_SHARED_LIB=ON \
+    -DWASMEDGE_BUILD_TOOLS=OFF \
+    -DWASMEDGE_BUILD_PLUGINS=OFF \
     -DCMAKE_BUILD_TYPE=Release
   cmake --build "$dest/build" --parallel
   info "WasmEdge built"
