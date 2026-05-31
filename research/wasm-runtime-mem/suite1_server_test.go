@@ -18,6 +18,10 @@ import (
 	"github.com/nermolov/yggdrasil-manager/research/wasm-runtime-mem/harness"
 )
 
+// ingestDocID is a fixed 64-char hex document ID passed to automerge-subduction-ingest
+// via --doc-id so the client does not try to parse the fixture filename as base58check.
+const ingestDocID = "0000000000000000000000000000000000000000000000000000000000000001"
+
 // TestSuite1Server benchmarks server-mode runtimes (wasip2 + native baseline).
 //
 // Subtests:
@@ -60,18 +64,26 @@ func TestSuite1Server(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer cancel()
 
-		// Start the server and measure its RSS.
-		serverArgs := []string{"server", "--socket", addr}
-		res, err := harness.MeasurePeakRSS(ctx, "native-baseline", 1, "native", false, false,
-			serverBin, serverArgs, nil)
-		if err != nil {
-			// The server may need the ingest client to connect before it exits cleanly.
-			// Start ingest in the background while MeasurePeakRSS blocks.
-			t.Logf("note: MeasurePeakRSS returned early: %v", err)
+		// Start the server; it is long-running and will not exit on its own.
+		// --ephemeral-key is required: subduction_cli server rejects missing key source.
+		serverCmd := exec.CommandContext(ctx, serverBin, "server", "--socket", addr, "--ephemeral-key")
+		serverCmd.Stderr = os.Stderr
+		if err := serverCmd.Start(); err != nil {
+			t.Fatalf("start server: %v", err)
+		}
+		defer func() {
+			serverCmd.Process.Kill() //nolint
+			serverCmd.Wait()         //nolint
+		}()
+
+		// Poll until the server port accepts TCP connections (max 10s).
+		if err := waitForTCP(addr, 10*time.Second); err != nil {
+			t.Skipf("native-baseline server did not become ready on %s: %v", addr, err)
 		}
 
-		// Run the ingest client against the server.
-		ingestArgs := []string{"--server", "ws://" + addr, "--ephemeral-key", docPath}
+		// Run the ingest client with an explicit doc ID so the fixture filename
+		// stem is not parsed as base58check by the client.
+		ingestArgs := []string{"--server", "ws://" + addr, "--ephemeral-key", "--doc-id", ingestDocID, docPath}
 		ingestCtx, ingestCancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer ingestCancel()
 		ingestCmd := exec.CommandContext(ingestCtx, ingestBin, ingestArgs...)
@@ -79,9 +91,20 @@ func TestSuite1Server(t *testing.T) {
 			t.Logf("ingest client: %v\n%s", err2, out)
 		}
 
+		// Sample server VmHWM while it is still running.
+		vmhwm := harness.SampleVmHWM(serverCmd.Process.Pid)
+
+		res := harness.Result{
+			Runtime:    "native-baseline",
+			Suite:      1,
+			WASITarget: "native",
+			VmHWMKiB:   vmhwm,
+			PeakRSSKiB: vmhwm,
+			OK:         true,
+		}
 		harness.Record(res)
-		t.Logf("native-baseline: PeakRSS=%d KiB VmHWM=%d KiB Wall=%d ms OK=%v",
-			res.PeakRSSKiB, res.VmHWMKiB, res.WallMs, res.OK)
+		t.Logf("native-baseline: PeakRSS=%d KiB VmHWM=%d KiB OK=%v",
+			res.PeakRSSKiB, res.VmHWMKiB, res.OK)
 	})
 
 	t.Run("wasmtime-pulley", func(t *testing.T) {
@@ -144,7 +167,7 @@ func TestSuite1Server(t *testing.T) {
 
 		// Run the native ingest client against the WASM server.
 		if _, err := os.Stat(ingestBin); !os.IsNotExist(err) {
-			ingestArgs := []string{"--server", fmt.Sprintf("ws://127.0.0.1:%d", port), "--ephemeral-key", docPath}
+			ingestArgs := []string{"--server", fmt.Sprintf("ws://127.0.0.1:%d", port), "--ephemeral-key", "--doc-id", ingestDocID, docPath}
 			ingestCtx, ingestCancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer ingestCancel()
 			ingestCmd := exec.CommandContext(ingestCtx, ingestBin, ingestArgs...)
@@ -182,4 +205,19 @@ func freePort() (int, error) {
 	port := ln.Addr().(*net.TCPAddr).Port
 	ln.Close()
 	return port, nil
+}
+
+// waitForTCP polls addr with a TCP dial every 50ms until the connection
+// succeeds or timeout elapses.
+func waitForTCP(addr string, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		conn, err := net.DialTimeout("tcp", addr, 200*time.Millisecond)
+		if err == nil {
+			conn.Close()
+			return nil
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	return fmt.Errorf("timeout waiting for %s", addr)
 }

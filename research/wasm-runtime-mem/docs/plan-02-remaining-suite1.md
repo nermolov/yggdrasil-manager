@@ -1,6 +1,6 @@
 ---
 title: "Suite 1 completion — native baseline + wasip2 component server (Option B)"
-status: not-started
+status: done
 option: B
 branch: claude/wasm-runtime-memory-tests-wRAbA
 supersedes_scope_of: plan-01-initial-implementation.md (Suite 1 only)
