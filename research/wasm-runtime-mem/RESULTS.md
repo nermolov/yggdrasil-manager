@@ -60,10 +60,23 @@ The native baseline was fixed to pass `--ephemeral-key` to `subduction_cli
 server` and a fixed `--doc-id` to the ingest client so the fixture filename
 stem is not parsed as base58check.
 
-| Runtime         | Target | Interp mode   | C-bound      | Peak RSS (MiB) | Peak RSS (KiB) |
-|-----------------|--------|---------------|--------------|----------------|----------------|
-| native-baseline | native | —             | —            | 14.7           | 15,020         |
-| wasmtime-pulley | wasip2 | Pulley interp | no (Rust)    | 64.7           | 66,216         |
+| Runtime          | Target | Interp mode   | C-bound      | Peak RSS (MiB) | Peak RSS (KiB) |
+|------------------|--------|---------------|--------------|----------------|----------------|
+| native-baseline  | native | —             | —            | 14.7           | 15,020         |
+| wasmtime-pulley  | wasip2 | Pulley interp | no (Rust)    | 64.7           | 66,216         |
+| wasmtime-wasip3  | wasip3 | Cranelift JIT | no (Rust)    | 28.8           | 29,540         |
+
+**wasmtime-wasip3 measurement notes:**
+- Built with `cargo +nightly-2026-02-01 -Z build-std=std,panic_abort --target wasm32-wasip3`.
+  The pinned nightly predates wasip3 stdlib support, so the component imports only
+  `wasi:*@0.3.0-rc-2026-01-06` interfaces (from `wasip3-0.4.0` in the dep graph).
+- Run with **wasmtime v41.0.0** (`wasmtime run -S p3 -S inherit-network -S tcp`) — the
+  first wasmtime release that provides the January 2026 RC host APIs.
+- The wasmtime CLI defaults to **Cranelift JIT**, not the Pulley portable interpreter
+  used for the wasip2 row. Lower RSS (~29 MiB vs ~65 MiB) reflects the JIT's smaller
+  resident set rather than a wasip3-specific efficiency gain; the two rows are not
+  directly comparable on interpreter mode. A Pulley-mode wasip3 comparison is left
+  for future work once wasmtime's wasip3 Pulley path stabilises.
 
 Note: the `automerge-subduction-ingest` client exits with an error because the
 minimal 58-byte `DocumentAM` fixture is not a complete Automerge document for

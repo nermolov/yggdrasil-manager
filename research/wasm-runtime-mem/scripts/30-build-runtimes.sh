@@ -181,6 +181,33 @@ build_wazero_runner() {
 }
 
 # ---------------------------------------------------------------------------
+# wasmtime-p3 CLI (pre-built binary, for Suite 1 wasip3 subtest)
+# Provides wasi:*@0.3.0-rc-2026-01-06 host APIs via -S p3 flag, matching
+# what the nightly-2026-02-01 build-std component imports.
+# ---------------------------------------------------------------------------
+download_wasmtime_p3() {
+  local dest="$ROOT_DIR/$BIN_DIR/wasmtime-p3"
+  if [ -f "$dest" ]; then info "wasmtime-p3 already present"; return 0; fi
+  local arch
+  arch="$(uname -m)"
+  local os
+  os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+  local url="https://github.com/bytecodealliance/wasmtime/releases/download/${WASMTIME_P3_TAG}/wasmtime-${WASMTIME_P3_TAG}-${arch}-${os}.tar.xz"
+  info "Downloading wasmtime-p3 from $url..."
+  local tmp
+  tmp="$(mktemp -d)"
+  curl -sL "$url" -o "$tmp/wasmtime-p3.tar.xz" || { info "WARN: wasmtime-p3 download failed — wasip3 subtest will be skipped"; rm -rf "$tmp"; return 0; }
+  tar -xJf "$tmp/wasmtime-p3.tar.xz" -C "$tmp" 2>/dev/null
+  local wt_bin
+  wt_bin="$(find "$tmp" -name 'wasmtime' -not -name 'wasmtime-min' -type f | head -1)"
+  if [ -z "$wt_bin" ]; then info "WARN: wasmtime-p3 binary not found in archive"; rm -rf "$tmp"; return 0; fi
+  cp "$wt_bin" "$dest"
+  chmod +x "$dest"
+  rm -rf "$tmp"
+  info "wasmtime-p3 (${WASMTIME_P3_TAG}) installed to $BIN_DIR/wasmtime-p3"
+}
+
+# ---------------------------------------------------------------------------
 # Run all builds in parallel, then build C runners after their runtimes
 # ---------------------------------------------------------------------------
 info "Starting parallel runtime builds..."
@@ -203,6 +230,9 @@ PID_WASMTIME=$!
 build_wazero_runner &
 PID_WAZERO=$!
 
+download_wasmtime_p3 &
+PID_WASMTIME_P3=$!
+
 # Wait for C-library runtimes before building their runners
 wait $PID_WASM3     && build_runner_wasm3 &
 wait $PID_WAMR      && { build_runner_wamr_classic & build_runner_wamr_fast & }
@@ -212,6 +242,7 @@ wait $PID_TOYWASM   && build_runner_toywasm &
 # Wait for all remaining background jobs
 wait $PID_WASMTIME
 wait $PID_WAZERO
+wait $PID_WASMTIME_P3
 wait
 
 info "All runtimes and runners built. Contents of $BIN_DIR:"
