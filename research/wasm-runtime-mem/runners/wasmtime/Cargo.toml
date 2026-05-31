@@ -8,12 +8,16 @@ name = "runner-wasmtime"
 path = "src/main.rs"
 
 [dependencies]
-# Wasmtime with Pulley interpreter; disable cranelift (JIT) codegen
-wasmtime = { version = "33", default-features = false, features = [
+# Wasmtime configured to run via the Pulley portable interpreter. Cranelift
+# stays enabled (Pulley bytecode is produced by the cranelift-based compiler),
+# but the Pulley target is selected at runtime so no native JIT executes.
+# WASI lives in the separate wasmtime-wasi crate; there is no `wasi` feature
+# on the wasmtime crate in v33.
+wasmtime = { version = "33", features = [
     "runtime",
-    "cranelift",  # keep for now — pulley is the interpreter engine selected at runtime
-    "wasi",
+    "cranelift",
+    "pulley",
     "component-model",
 ] }
-wasmtime-wasi = { version = "33", default-features = false }
+wasmtime-wasi = { version = "33" }
 anyhow = "1"
