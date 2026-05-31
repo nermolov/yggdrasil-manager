@@ -132,8 +132,12 @@ build_toywasm() {
   git clone --depth=1 https://github.com/yamt/toywasm.git "$dest/src" 2>/dev/null || true
   (cd "$dest/src" && git checkout "$TOYWASM_SHA" 2>/dev/null || true)
   mkdir -p "$dest/build"
-  cmake -S "$dest/src" -B "$dest/build" -DCMAKE_BUILD_TYPE=Release
+  # BUILD_TESTING pulls a required find_program(wat2wasm); we only need the libs.
+  cmake -S "$dest/src" -B "$dest/build" -DCMAKE_BUILD_TYPE=Release \
+    -DBUILD_TESTING=OFF -DBUILD_SHARED_LIBS=OFF
   cmake --build "$dest/build" --parallel
+  # The runner consumes the install layout (exposes the <toywasm/...> headers).
+  cmake --install "$dest/build" --prefix "$dest/install"
   info "toywasm built"
 }
 
@@ -144,6 +148,7 @@ build_runner_toywasm() {
     cmake -S . -B build \
       -DTOYWASM_SRC="$dest/src" \
       -DTOYWASM_BUILD="$dest/build" \
+      -DTOYWASM_INSTALL="$dest/install" \
       -DCMAKE_BUILD_TYPE=Release && \
     cmake --build build --parallel && \
     cp build/runner-toywasm "$ROOT_DIR/$BIN_DIR/")
